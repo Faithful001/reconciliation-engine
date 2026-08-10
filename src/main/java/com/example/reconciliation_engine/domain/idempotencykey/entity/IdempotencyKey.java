@@ -1,4 +1,4 @@
-package com.example.reconciliation_engine.domain.idempotency_key.entity;
+package com.example.reconciliation_engine.domain.idempotencykey.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

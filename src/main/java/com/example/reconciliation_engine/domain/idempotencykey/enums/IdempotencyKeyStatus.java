@@ -1,4 +1,4 @@
-package com.example.reconciliation_engine.domain.idempotency_key.enums;
+package com.example.reconciliation_engine.domain.idempotencykey.enums;
 
 public enum IdempotencyKeyStatus {
     PENDING,
