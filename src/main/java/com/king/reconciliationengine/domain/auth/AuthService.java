@@ -1,0 +1,47 @@
+package com.king.reconciliationengine.domain.auth;
+
+import com.king.reconciliationengine.domain.auth.dto.LoginDto;
+import com.king.reconciliationengine.domain.auth.dto.RegisterDto;
+import com.king.reconciliationengine.domain.user.UserRepository;
+import com.king.reconciliationengine.domain.user.UserService;
+import com.king.reconciliationengine.domain.user.entity.User;
+import com.king.reconciliationengine.infrastructure.security.jwt.JwtService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.Map;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+    private final UserRepository userRepository;
+    private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+
+    public User register(RegisterDto payload) {
+        return userService.create(
+                payload.getFirstName(),
+                payload.getLastName(),
+                payload.getEmail(),
+                payload.getPassword()
+        );
+    }
+
+    public Map<String, Object> login(LoginDto payload) {
+        User user = userRepository.findByEmail(payload.getEmail())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+
+        if (!passwordEncoder.matches(payload.getPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Invalid credentials");
+        }
+
+        String token = jwtService.generateToken(user.getId(), user.getEmail());
+
+        return Map.of(
+                "user", user,
+                "token", token
+        );
+    }
+}
