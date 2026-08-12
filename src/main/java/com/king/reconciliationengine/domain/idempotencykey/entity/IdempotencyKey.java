@@ -1,5 +1,6 @@
 package com.king.reconciliationengine.domain.idempotencykey.entity;
 
+import com.king.reconciliationengine.domain.idempotencykey.enums.IdempotencyKeyStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -11,6 +12,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class IdempotencyKey {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -21,10 +23,10 @@ public class IdempotencyKey {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private IdempotencyKey status;
+    private IdempotencyKeyStatus status;
 
     @Column(nullable = false)
-    private String request_hash;
+    private String requestHash;
 
     @Column(nullable = false, columnDefinition = "jsonb")
     private String response;
@@ -37,7 +39,9 @@ public class IdempotencyKey {
 
     @PrePersist
     public void prePersist() {
-        createdAt = Instant.now();
+        Instant now = Instant.now();
+        createdAt = now;
+        updatedAt = now;
     }
 
     @PreUpdate

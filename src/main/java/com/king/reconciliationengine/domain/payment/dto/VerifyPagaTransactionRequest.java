@@ -2,7 +2,7 @@ package com.king.reconciliationengine.domain.payment.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-public record VerifyPagaTransactionDto(
+public record VerifyPagaTransactionRequest(
         @NotBlank
         String paymentReference,
 

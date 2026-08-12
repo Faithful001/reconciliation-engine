@@ -19,7 +19,9 @@ import java.util.UUID;
 public class JwtService {
     private JwtProperties jwtProperties;
 
-    private Key getSigningKey() {return Keys.hmacShaKeyFor(jwtProperties.secret().getBytes());}
+    private Key getSigningKey() {
+        return Keys.hmacShaKeyFor(jwtProperties.secret().getBytes());
+    }
 
     public String generateToken(UUID userId, String email) {
         Date now = new Date();
