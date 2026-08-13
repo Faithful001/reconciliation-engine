@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name="idempotency_keys")
+@Table(name="idempotency_keys", uniqueConstraints = @UniqueConstraint(columnNames = "value"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,7 +20,7 @@ public class IdempotencyKey {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String value;
 
     @JoinColumn(name = "payment_id", nullable = false)
@@ -34,7 +34,7 @@ public class IdempotencyKey {
     @Column(nullable = false)
     private String requestHash;
 
-    @Column(nullable = false, columnDefinition = "jsonb")
+    @Column(columnDefinition = "TEXT")
     private String response;
 
     @Column(updatable = false, nullable = false)

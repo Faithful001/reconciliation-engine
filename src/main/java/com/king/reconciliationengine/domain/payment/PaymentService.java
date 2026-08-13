@@ -1,21 +1,24 @@
 package com.king.reconciliationengine.domain.payment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.king.reconciliationengine.common.response.Response;
 import com.king.reconciliationengine.domain.idempotencykey.IdempotencyKeyRepository;
 import com.king.reconciliationengine.domain.idempotencykey.entity.IdempotencyKey;
 import com.king.reconciliationengine.domain.idempotencykey.enums.IdempotencyKeyStatus;
 import com.king.reconciliationengine.domain.payment.dto.CheckoutDto;
+import com.king.reconciliationengine.domain.payment.dto.GetPaymentStatusResponseData;
 import com.king.reconciliationengine.domain.payment.entity.Payment;
 import com.king.reconciliationengine.domain.payment.enums.PaymentStatus;
 import com.king.reconciliationengine.domain.user.UserService;
 import com.king.reconciliationengine.infrastructure.paymentgateway.paga.PagaClient;
 import com.king.reconciliationengine.infrastructure.paymentgateway.paga.dto.PagaCheckoutRequest;
-import com.king.reconciliationengine.infrastructure.paymentgateway.paga.dto.PagaCheckoutResponse;
-import com.king.reconciliationengine.common.response.Response;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.crypto.Mac;
@@ -25,95 +28,116 @@ import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 
-@RequiredArgsConstructor
 @Service
+@RequiredArgsConstructor
 public class PaymentService {
     private final UserService userService;
     private final PagaClient pagaClient;
     private final PaymentRepository paymentRepository;
     private final IdempotencyKeyRepository idempotencyKeyRepository;
-    private final ObjectMapper objectMapper;
 
     @Value("${payload.secret.key}")
     private final String payloadSecret;
 
-    public PagaCheckoutResponse checkout(CheckoutDto payload, String userId, String idempotencyKey) {
+    @Value("${paga.public.key}")
+    private final String pagaPublicKey;
+
+    @Value("${paga.webhook.callback.url}")
+    private final String webhookCallbackUrl;
+
+    @Transactional
+    public ResponseEntity<Response<String>> checkout(CheckoutDto payload, String userId, String idempotencyKey) {
         userService.getById(userId);
 
         Optional<IdempotencyKey> existing = idempotencyKeyRepository.findByValue(idempotencyKey);
+        String payloadHash = hashPayload(payload, userId);
 
         if (existing.isPresent()) {
             IdempotencyKey record = existing.get();
 
+            if (!record.getRequestHash().equals(payloadHash)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "Idempotency key reused with a different request payload");
+            }
 
             return switch (record.getStatus()) {
-                case PENDING -> throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "Request already in progress"
-                );
-                case COMPLETED, FAILED_TERMINAL -> {
-                    try {
-                        yield objectMapper.readValue(record.getResponse(), PagaCheckoutResponse.class);
-                    } catch (Exception e) {
-                        throw new IllegalStateException("Failed to deserialize stored response", e);
+                case PENDING -> {
+                    if (record.getResponse() == null) {
+                        throw new ResponseStatusException(
+                                HttpStatus.CONFLICT, "Request already in progress");
                     }
+                    yield ResponseEntity.ok(Response.success("Checkout already initiated", record.getResponse()));
+                }
+                case RESOLVED -> {
+                    Payment payment = record.getPayment();
+                    boolean succeeded = payment.getPaymentStatus() == PaymentStatus.CAPTURED;
+                    String message = succeeded ? "Payment already completed" : "Payment already failed";
+
+                    if (!succeeded) {
+                        throw new ResponseStatusException(
+                                HttpStatus.CONFLICT, message + " — retry with a new idempotency key");
+                    }
+                    yield ResponseEntity.ok(Response.success(message, payment.getReference()));
                 }
                 case UNKNOWN -> throw new ResponseStatusException(
                         HttpStatus.CONFLICT,
-                        "Previous request outcome unknown. Requires manual verification"
-                );
+                        "Previous request outcome unknown. Requires manual verification");
             };
         }
 
         String txRef = "pay_" + UUID.randomUUID().toString().substring(0, 12);
+        String currency = payload.currency() != null ? payload.currency() : "NGN";
 
         Payment paymentInstance = Payment.builder()
                 .amount(payload.amount())
-                .currency("NGN")
+                .currency(currency)
                 .paymentStatus(PaymentStatus.PENDING)
                 .reference(txRef)
                 .build();
 
         paymentRepository.save(paymentInstance);
 
-        String payloadHash = hashPayload(payload, userId);
+        PagaCheckoutRequest pagaPayload = PagaCheckoutRequest.builder()
+                .publicKey(pagaPublicKey)
+                .email(payload.email())
+                .amount(payload.amount())
+                .currency(currency)
+                .paymentReference(txRef)
+                .callbackUrl(webhookCallbackUrl)
+                .build();
+
+        String checkoutLink = pagaClient.buildCheckoutLink(pagaPayload);
 
         IdempotencyKey idempotencyKeyRecord = IdempotencyKey.builder()
                 .value(idempotencyKey)
                 .status(IdempotencyKeyStatus.PENDING)
                 .requestHash(payloadHash)
                 .payment(paymentInstance)
-                .response(null)
+                .response(checkoutLink)
                 .build();
 
-        idempotencyKeyRepository.save(idempotencyKeyRecord);
-
-        PagaCheckoutRequest pagaPayload = PagaCheckoutRequest.builder()
-                .email(payload.email())
-                .amount(payload.amount())
-                .currency("NGN")
-                .payment_reference(txRef)
-                .build();
-
-        PagaCheckoutResponse response;
         try {
-            response = pagaClient.checkout(pagaPayload);
-        } catch (Exception e) {
-            idempotencyKeyRecord.setStatus(IdempotencyKeyStatus.UNKNOWN);
             idempotencyKeyRepository.save(idempotencyKeyRecord);
-            throw new ResponseStatusException(
-                    HttpStatus.SERVICE_UNAVAILABLE,
-                    "Payment gateway did not respond — status unknown, do not retry blindly", e);
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Request already in progress");
         }
 
-        try {
-            idempotencyKeyRecord.setResponse(objectMapper.writeValueAsString(response));
-            idempotencyKeyRepository.save(idempotencyKeyRecord);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to stringify gateway response", e);
-        }
+        return ResponseEntity.ok(Response.success("Checkout successful", checkoutLink));
+    }
 
-        return response;
+    public ResponseEntity<Response<GetPaymentStatusResponseData>> getStatus(String reference) {
+        Payment payment = paymentRepository.findByReference(reference)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Payment not found"));
+
+        GetPaymentStatusResponseData dto = new GetPaymentStatusResponseData(
+                payment.getReference(),
+                payment.getPaymentStatus(),
+                payment.getAmount(),
+                payment.getCurrency()
+        );
+
+        return ResponseEntity.ok(Response.success("Payment status retrieved", dto));
     }
 
     private String hashPayload(CheckoutDto checkoutDto, String userId) {

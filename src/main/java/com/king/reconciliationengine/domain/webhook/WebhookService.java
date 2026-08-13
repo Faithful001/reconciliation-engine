@@ -5,6 +5,7 @@ import com.king.reconciliationengine.domain.idempotencykey.IdempotencyKeyReposit
 import com.king.reconciliationengine.domain.idempotencykey.entity.IdempotencyKey;
 import com.king.reconciliationengine.domain.idempotencykey.enums.IdempotencyKeyStatus;
 import com.king.reconciliationengine.domain.payment.PaymentRepository;
+import com.king.reconciliationengine.domain.webhook.dto.StoredOutcome;
 import com.king.reconciliationengine.domain.payment.entity.Payment;
 import com.king.reconciliationengine.domain.payment.enums.PaymentStatus;
 import com.king.reconciliationengine.domain.webhook.dto.WebhookPayload;
@@ -66,8 +67,7 @@ public class WebhookService {
 
         IdempotencyKey record = idempotencyKeyRecord.get();
 
-        if (record.getStatus() == IdempotencyKeyStatus.COMPLETED
-                || record.getStatus() == IdempotencyKeyStatus.FAILED_TERMINAL) {
+        if (record.getStatus() == IdempotencyKeyStatus.RESOLVED) {
             log.info("Duplicate webhook for already-terminal payment {}, ignoring",
                     payment.getReference());
             return ResponseEntity.ok(Response.success("Acknowledged", null));
@@ -76,13 +76,12 @@ public class WebhookService {
         boolean succeeded = "0".equals(payload.statusCode());
 
         payment.setPaymentStatus(succeeded ? PaymentStatus.CAPTURED : PaymentStatus.FAILED);
-        record.setStatus(succeeded ? IdempotencyKeyStatus.COMPLETED : IdempotencyKeyStatus.FAILED_TERMINAL);
+        record.setStatus(IdempotencyKeyStatus.RESOLVED);
 
         try {
-            record.setResponse(objectMapper.writeValueAsString(payload));
+            record.setResponse(objectMapper.writeValueAsString(StoredOutcome.from(payload)));
         } catch (Exception e) {
-            log.error("Failed to serialize webhook payload for reference {}",
-                    payment.getReference(), e);
+            log.error("Failed to serialize webhook payload for reference {}", payment.getReference(), e);
         }
 
         paymentRepository.save(payment);

@@ -11,22 +11,22 @@ import java.math.BigDecimal;
 @Builder
 public record PagaCheckoutRequest(
         @NotBlank
-        String public_key, // internal
+        String publicKey, // internal
 
         @NotNull
         @Positive
         BigDecimal amount,
 
         String currency,	// internal
-        String payment_reference, // internal
-        String charge_url,	// internal
-        String phone_number, //	internal
+        String paymentReference, // internal
+        String chargeUrl,	// internal
+        String phoneNumber, //	internal
 
         @Email
         String email,
-        String display_image,	// internal
-        String callback_url,	// internal
-        String funding_sources	// internal - No
+        String displayImage,	// internal
+        String callbackUrl,	// internal
+        String fundingSources	// internal - No
 
 ) {
 }

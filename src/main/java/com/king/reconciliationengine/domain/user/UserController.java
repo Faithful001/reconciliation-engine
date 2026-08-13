@@ -14,12 +14,6 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
     private final UserService userService;
 
-//    @Operation(summary = "Get a user by ID")
-//    @GetMapping("/{id}")
-//    public User getById(@PathVariable String id) {
-//        return userService.getById(id);
-//    }
-
     @Operation(summary = "Get me")
     @GetMapping("/me")
     public User getMe(

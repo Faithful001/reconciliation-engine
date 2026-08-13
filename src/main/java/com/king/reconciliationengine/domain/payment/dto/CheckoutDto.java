@@ -13,6 +13,8 @@ public record CheckoutDto(
 
         @NotNull
         @Positive
-        BigDecimal amount
+        BigDecimal amount,
+
+        String currency
 ) {
 }
