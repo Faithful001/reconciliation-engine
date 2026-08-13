@@ -1,13 +1,15 @@
 package com.king.reconciliationengine.domain.idempotencykey.entity;
 
 import com.king.reconciliationengine.domain.idempotencykey.enums.IdempotencyKeyStatus;
+import com.king.reconciliationengine.domain.payment.entity.Payment;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
 import java.util.UUID;
 
-@Entity(name="idempotency_keys")
+@Entity
+@Table(name="idempotency_keys")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,6 +22,10 @@ public class IdempotencyKey {
 
     @Column(nullable = false, unique = true)
     private String value;
+
+    @JoinColumn(name = "payment_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    private Payment payment;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

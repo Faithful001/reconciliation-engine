@@ -8,7 +8,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-@Entity(name="payments")
+@Entity
+@Table(name="payments", indexes = {
+        @Index(name = "idx_payment_reference", columnList = "reference")
+})
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
