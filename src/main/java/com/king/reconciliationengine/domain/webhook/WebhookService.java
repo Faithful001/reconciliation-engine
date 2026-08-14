@@ -75,7 +75,7 @@ public class WebhookService {
 
         boolean succeeded = "0".equals(payload.statusCode());
 
-        payment.setPaymentStatus(succeeded ? PaymentStatus.CAPTURED : PaymentStatus.FAILED);
+        payment.setStatus(succeeded ? PaymentStatus.CAPTURED : PaymentStatus.FAILED);
         record.setStatus(IdempotencyKeyStatus.RESOLVED);
 
         try {

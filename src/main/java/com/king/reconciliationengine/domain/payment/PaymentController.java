@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/payments")
 @RequiredArgsConstructor
@@ -18,14 +20,17 @@ public class PaymentController {
     @PostMapping("/checkout")
     public ResponseEntity<Response<String>> checkout(
             @Valid @RequestBody CheckoutDto payload,
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal UUID userId,
             @RequestHeader("Idempotency-Key") String idempotencyKey
     ) {
         return paymentService.checkout(payload, userId, idempotencyKey);
     }
 
     @GetMapping("/{reference}/status")
-    public ResponseEntity<Response<GetPaymentStatusResponseData>> getStatus(@PathVariable String reference) {
-        return paymentService.getStatus(reference);
+    public ResponseEntity<Response<GetPaymentStatusResponseData>> getStatus(
+            @PathVariable String reference,
+            @AuthenticationPrincipal UUID userId
+    ) {
+        return paymentService.getStatus(reference, userId);
     }
 }

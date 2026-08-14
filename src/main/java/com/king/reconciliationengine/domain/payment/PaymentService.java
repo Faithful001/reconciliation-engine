@@ -10,6 +10,7 @@ import com.king.reconciliationengine.domain.payment.dto.GetPaymentStatusResponse
 import com.king.reconciliationengine.domain.payment.entity.Payment;
 import com.king.reconciliationengine.domain.payment.enums.PaymentStatus;
 import com.king.reconciliationengine.domain.user.UserService;
+import com.king.reconciliationengine.domain.user.entity.User;
 import com.king.reconciliationengine.infrastructure.paymentgateway.paga.PagaClient;
 import com.king.reconciliationengine.infrastructure.paymentgateway.paga.dto.PagaCheckoutRequest;
 import lombok.RequiredArgsConstructor;
@@ -46,8 +47,8 @@ public class PaymentService {
     private final String webhookCallbackUrl;
 
     @Transactional
-    public ResponseEntity<Response<String>> checkout(CheckoutDto payload, String userId, String idempotencyKey) {
-        userService.getById(userId);
+    public ResponseEntity<Response<String>> checkout(CheckoutDto payload, UUID userId, String idempotencyKey) {
+        User user = userService.getById(userId);
 
         Optional<IdempotencyKey> existing = idempotencyKeyRepository.findByValue(idempotencyKey);
         String payloadHash = hashPayload(payload, userId);
@@ -70,7 +71,7 @@ public class PaymentService {
                 }
                 case RESOLVED -> {
                     Payment payment = record.getPayment();
-                    boolean succeeded = payment.getPaymentStatus() == PaymentStatus.CAPTURED;
+                    boolean succeeded = payment.getStatus() == PaymentStatus.CAPTURED;
                     String message = succeeded ? "Payment already completed" : "Payment already failed";
 
                     if (!succeeded) {
@@ -91,8 +92,9 @@ public class PaymentService {
         Payment paymentInstance = Payment.builder()
                 .amount(payload.amount())
                 .currency(currency)
-                .paymentStatus(PaymentStatus.PENDING)
+                .status(PaymentStatus.PENDING)
                 .reference(txRef)
+                .user(user)
                 .build();
 
         paymentRepository.save(paymentInstance);
@@ -125,14 +127,14 @@ public class PaymentService {
         return ResponseEntity.ok(Response.success("Checkout successful", checkoutLink));
     }
 
-    public ResponseEntity<Response<GetPaymentStatusResponseData>> getStatus(String reference) {
-        Payment payment = paymentRepository.findByReference(reference)
+    public ResponseEntity<Response<GetPaymentStatusResponseData>> getStatus(String reference, UUID userId) {
+        Payment payment = paymentRepository.findByReferenceAndUserId(reference, userId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Payment not found"));
 
         GetPaymentStatusResponseData dto = new GetPaymentStatusResponseData(
                 payment.getReference(),
-                payment.getPaymentStatus(),
+                payment.getStatus(),
                 payment.getAmount(),
                 payment.getCurrency()
         );
@@ -140,7 +142,7 @@ public class PaymentService {
         return ResponseEntity.ok(Response.success("Payment status retrieved", dto));
     }
 
-    private String hashPayload(CheckoutDto checkoutDto, String userId) {
+    private String hashPayload(CheckoutDto checkoutDto, UUID userId) {
         try {
             String payload = userId + "|" + checkoutDto.email() + "|" + checkoutDto.amount();
             Mac mac = Mac.getInstance("HmacSHA256");

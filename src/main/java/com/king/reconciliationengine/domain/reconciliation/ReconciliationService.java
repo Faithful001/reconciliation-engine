@@ -68,12 +68,12 @@ public class ReconciliationService {
 
         switch (verifyResponse.status_code()) {
             case 0 -> {
-                payment.setPaymentStatus(PaymentStatus.CAPTURED);
+                payment.setStatus(PaymentStatus.CAPTURED);
                 record.setStatus(IdempotencyKeyStatus.RESOLVED);
                 log.info("Reconciled {} as CAPTURED via verify (webhook likely dropped)", payment.getReference());
             }
             case 1 -> {
-                payment.setPaymentStatus(PaymentStatus.FAILED);
+                payment.setStatus(PaymentStatus.FAILED);
                 record.setStatus(IdempotencyKeyStatus.RESOLVED);
                 log.info("Reconciled {} as FAILED via verify", payment.getReference());
             }
