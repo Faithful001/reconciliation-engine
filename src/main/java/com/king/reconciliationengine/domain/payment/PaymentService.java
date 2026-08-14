@@ -36,13 +36,13 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final IdempotencyKeyRepository idempotencyKeyRepository;
 
-    @Value("${payload.secret.key}")
+    @Value("${payload.secret-key}")
     private final String payloadSecret;
 
-    @Value("${paga.public.key}")
+    @Value("${paga.public-key}")
     private final String pagaPublicKey;
 
-    @Value("${paga.webhook.callback.url}")
+    @Value("${webhook-callback-url}")
     private final String webhookCallbackUrl;
 
     @Transactional
