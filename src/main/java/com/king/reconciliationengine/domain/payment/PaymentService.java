@@ -1,6 +1,5 @@
 package com.king.reconciliationengine.domain.payment;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.king.reconciliationengine.common.response.Response;
 import com.king.reconciliationengine.domain.idempotencykey.IdempotencyKeyRepository;
 import com.king.reconciliationengine.domain.idempotencykey.entity.IdempotencyKey;
