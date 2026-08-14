@@ -4,7 +4,9 @@ import com.king.reconciliationengine.domain.idempotencykey.IdempotencyKeyReposit
 import com.king.reconciliationengine.domain.idempotencykey.entity.IdempotencyKey;
 import com.king.reconciliationengine.domain.idempotencykey.enums.IdempotencyKeyStatus;
 import com.king.reconciliationengine.domain.payment.PaymentRepository;
+import com.king.reconciliationengine.domain.payment.PaymentStatusHistoryService;
 import com.king.reconciliationengine.domain.payment.entity.Payment;
+import com.king.reconciliationengine.domain.payment.enums.ChangeSource;
 import com.king.reconciliationengine.domain.payment.enums.PaymentStatus;
 import com.king.reconciliationengine.infrastructure.paymentgateway.paga.PagaClient;
 import com.king.reconciliationengine.infrastructure.paymentgateway.paga.dto.PagaVerifyRequest;
@@ -25,6 +27,7 @@ public class ReconciliationService {
 
     private final IdempotencyKeyRepository idempotencyKeyRepository;
     private final PaymentRepository paymentRepository;
+    private final PaymentStatusHistoryService paymentStatusHistoryService;
     private final PagaClient pagaClient;
 
     @Value("${paga.public-key}")
@@ -32,6 +35,9 @@ public class ReconciliationService {
 
     @Value("${paga.auth-header}")
     private String authHeader;
+
+    @Value("${reconciliation.max-attempts}")
+    private int maxAttempts;
 
     private static final Duration STUCK_THRESHOLD = Duration.ofMinutes(15);
 
@@ -48,6 +54,8 @@ public class ReconciliationService {
     private void reconcileOne(IdempotencyKey record) {
         Payment payment = record.getPayment();
 
+        payment.setReconciliationAttempts(payment.getReconciliationAttempts() + 1);
+
         PagaVerifyRequest verifyRequest = new PagaVerifyRequest(
                 payment.getReference(),
                 pagaPublicKey,
@@ -60,22 +68,44 @@ public class ReconciliationService {
             verifyResponse = pagaClient.verify(verifyRequest, authHeader);
         } catch (Exception e) {
             log.error("Verify call failed for {}", payment.getReference(), e);
+            paymentRepository.save(payment);
             return;
         }
+
+        PaymentStatus oldStatus = payment.getStatus();
 
         switch (verifyResponse.status_code()) {
             case 0 -> {
                 payment.setStatus(PaymentStatus.CAPTURED);
                 record.setStatus(IdempotencyKeyStatus.RESOLVED);
+                paymentStatusHistoryService.record(payment, oldStatus, PaymentStatus.CAPTURED, ChangeSource.RECONCILIATION);
                 log.info("Reconciled {} as CAPTURED via verify (webhook likely dropped)", payment.getReference());
             }
             case 1 -> {
                 payment.setStatus(PaymentStatus.FAILED);
                 record.setStatus(IdempotencyKeyStatus.RESOLVED);
+                paymentStatusHistoryService.record(payment, oldStatus, PaymentStatus.FAILED, ChangeSource.RECONCILIATION);
                 log.info("Reconciled {} as FAILED via verify", payment.getReference());
             }
-            case 2 -> log.debug("{} still pending on Paga's side, leaving as-is", payment.getReference());
+            case 2 -> {
+                if (payment.getReconciliationAttempts() >= maxAttempts) {
+                    payment.setStatus(PaymentStatus.NEEDS_REVIEW);
+                    record.setStatus(IdempotencyKeyStatus.UNKNOWN);
+                    paymentStatusHistoryService.record(payment, oldStatus, PaymentStatus.NEEDS_REVIEW, ChangeSource.RECONCILIATION);
+                    log.warn("{} still pending after {} attempts — escalated to NEEDS_REVIEW",
+                            payment.getReference(), payment.getReconciliationAttempts());
+                } else {
+                    log.debug("{} still pending on Paga's side (attempt {}/{}), leaving as-is",
+                            payment.getReference(), payment.getReconciliationAttempts(), maxAttempts);
+                }
+            }
             default -> {
+                if (payment.getReconciliationAttempts() >= maxAttempts) {
+                    payment.setStatus(PaymentStatus.NEEDS_REVIEW);
+                    paymentStatusHistoryService.record(payment, oldStatus, PaymentStatus.NEEDS_REVIEW, ChangeSource.RECONCILIATION);
+                    log.warn("{} returned ambiguous status_code {} after {} attempts — escalated to NEEDS_REVIEW",
+                            payment.getReference(), verifyResponse.status_code(), payment.getReconciliationAttempts());
+                }
                 record.setStatus(IdempotencyKeyStatus.UNKNOWN);
                 log.warn("Unexpected verify status_code {} for {} — needs manual review",
                         verifyResponse.status_code(), payment.getReference());
@@ -85,4 +115,4 @@ public class ReconciliationService {
         paymentRepository.save(payment);
         idempotencyKeyRepository.save(record);
     }
-}
+}

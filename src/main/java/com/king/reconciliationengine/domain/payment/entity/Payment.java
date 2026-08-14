@@ -38,6 +38,10 @@ public class Payment {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private int reconciliationAttempts = 0;
+
     @Column(updatable = false, nullable = false)
     private Instant createdAt;
 

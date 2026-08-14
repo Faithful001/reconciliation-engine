@@ -7,6 +7,7 @@ import com.king.reconciliationengine.domain.idempotencykey.enums.IdempotencyKeyS
 import com.king.reconciliationengine.domain.payment.dto.CheckoutDto;
 import com.king.reconciliationengine.domain.payment.dto.GetPaymentStatusResponseData;
 import com.king.reconciliationengine.domain.payment.entity.Payment;
+import com.king.reconciliationengine.domain.payment.enums.ChangeSource;
 import com.king.reconciliationengine.domain.payment.enums.PaymentStatus;
 import com.king.reconciliationengine.domain.user.UserService;
 import com.king.reconciliationengine.domain.user.entity.User;
@@ -35,6 +36,7 @@ public class PaymentService {
     private final PagaClient pagaClient;
     private final PaymentRepository paymentRepository;
     private final IdempotencyKeyRepository idempotencyKeyRepository;
+    private final PaymentStatusHistoryService paymentStatusHistoryService;
 
     @Value("${payment-payload.secret-key}")
     private String payloadSecret;
@@ -97,6 +99,7 @@ public class PaymentService {
                 .build();
 
         paymentRepository.save(paymentInstance);
+        paymentStatusHistoryService.record(paymentInstance, null, PaymentStatus.PENDING, ChangeSource.CHECKOUT);
 
         PagaCheckoutRequest pagaPayload = PagaCheckoutRequest.builder()
                 .publicKey(pagaPublicKey)

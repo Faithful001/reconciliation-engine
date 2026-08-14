@@ -9,5 +9,6 @@ public enum PaymentStatus {
     CAPTURED,
     FAILED,
     TIMED_OUT,
-    REFUNDED
+    REFUNDED,
+    NEEDS_REVIEW
 }

@@ -5,8 +5,10 @@ import com.king.reconciliationengine.domain.idempotencykey.IdempotencyKeyReposit
 import com.king.reconciliationengine.domain.idempotencykey.entity.IdempotencyKey;
 import com.king.reconciliationengine.domain.idempotencykey.enums.IdempotencyKeyStatus;
 import com.king.reconciliationengine.domain.payment.PaymentRepository;
+import com.king.reconciliationengine.domain.payment.PaymentStatusHistoryService;
 import com.king.reconciliationengine.domain.webhook.dto.StoredOutcome;
 import com.king.reconciliationengine.domain.payment.entity.Payment;
+import com.king.reconciliationengine.domain.payment.enums.ChangeSource;
 import com.king.reconciliationengine.domain.payment.enums.PaymentStatus;
 import com.king.reconciliationengine.domain.webhook.dto.WebhookPayload;
 import tools.jackson.databind.ObjectMapper;
@@ -31,6 +33,7 @@ public class WebhookService {
 
     private final PaymentRepository paymentRepository;
     private final IdempotencyKeyRepository idempotencyKeyRepository;
+    private final PaymentStatusHistoryService paymentStatusHistoryService;
     private final ObjectMapper objectMapper;
 
     @Value("${paga.webhook-secret}")
@@ -75,8 +78,13 @@ public class WebhookService {
 
         boolean succeeded = "0".equals(payload.statusCode());
 
-        payment.setStatus(succeeded ? PaymentStatus.CAPTURED : PaymentStatus.FAILED);
+        PaymentStatus oldStatus = payment.getStatus();
+        PaymentStatus newStatus = succeeded ? PaymentStatus.CAPTURED : PaymentStatus.FAILED;
+
+        payment.setStatus(newStatus);
         record.setStatus(IdempotencyKeyStatus.RESOLVED);
+
+        paymentStatusHistoryService.record(payment, oldStatus, newStatus, ChangeSource.WEBHOOK);
 
         try {
             record.setResponse(objectMapper.writeValueAsString(StoredOutcome.from(payload)));
@@ -107,4 +115,4 @@ public class WebhookService {
             return false;
         }
     }
-}
+}
