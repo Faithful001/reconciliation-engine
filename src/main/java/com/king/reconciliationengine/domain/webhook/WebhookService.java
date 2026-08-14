@@ -9,7 +9,7 @@ import com.king.reconciliationengine.domain.webhook.dto.StoredOutcome;
 import com.king.reconciliationengine.domain.payment.entity.Payment;
 import com.king.reconciliationengine.domain.payment.enums.PaymentStatus;
 import com.king.reconciliationengine.domain.webhook.dto.WebhookPayload;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,7 +33,7 @@ public class WebhookService {
     private final IdempotencyKeyRepository idempotencyKeyRepository;
     private final ObjectMapper objectMapper;
 
-    @Value("${webhook.secret}")
+    @Value("${paga.webhook-secret}")
     private String webhookSecret;
 
     public ResponseEntity<Response<Void>> processCall(WebhookPayload payload) {

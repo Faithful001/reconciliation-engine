@@ -1,13 +1,11 @@
 package com.king.reconciliationengine.domain.reconciliation;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.king.reconciliationengine.domain.idempotencykey.IdempotencyKeyRepository;
 import com.king.reconciliationengine.domain.idempotencykey.entity.IdempotencyKey;
 import com.king.reconciliationengine.domain.idempotencykey.enums.IdempotencyKeyStatus;
 import com.king.reconciliationengine.domain.payment.PaymentRepository;
 import com.king.reconciliationengine.domain.payment.entity.Payment;
 import com.king.reconciliationengine.domain.payment.enums.PaymentStatus;
-import com.king.reconciliationengine.domain.webhook.dto.StoredOutcome;
 import com.king.reconciliationengine.infrastructure.paymentgateway.paga.PagaClient;
 import com.king.reconciliationengine.infrastructure.paymentgateway.paga.dto.PagaVerifyRequest;
 import com.king.reconciliationengine.infrastructure.paymentgateway.paga.dto.PagaVerifyResponse;
@@ -28,13 +26,12 @@ public class ReconciliationService {
     private final IdempotencyKeyRepository idempotencyKeyRepository;
     private final PaymentRepository paymentRepository;
     private final PagaClient pagaClient;
-    private final ObjectMapper objectMapper;
 
     @Value("${paga.public-key}")
-    private final String pagaPublicKey;
+    private String pagaPublicKey;
 
     @Value("${paga.auth-header}")
-    private final String authHeader;
+    private String authHeader;
 
     private static final Duration STUCK_THRESHOLD = Duration.ofMinutes(15);
 

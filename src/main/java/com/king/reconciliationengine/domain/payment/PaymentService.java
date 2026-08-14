@@ -36,14 +36,14 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final IdempotencyKeyRepository idempotencyKeyRepository;
 
-    @Value("${payload.secret-key}")
-    private final String payloadSecret;
+    @Value("${payment-payload.secret-key}")
+    private String payloadSecret;
 
     @Value("${paga.public-key}")
-    private final String pagaPublicKey;
+    private String pagaPublicKey;
 
     @Value("${webhook-callback-url}")
-    private final String webhookCallbackUrl;
+    private String webhookCallbackUrl;
 
     @Transactional
     public ResponseEntity<Response<String>> checkout(CheckoutDto payload, UUID userId, String idempotencyKey) {

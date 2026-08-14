@@ -1,36 +1,47 @@
 package com.king.reconciliationengine.domain.webhook.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
+@Schema(description = "Payment gateway webhook notification payload")
 public record WebhookPayload(
+        @Schema(description = "Response status code ('0' indicating success)", example = "0")
         @NotBlank
-        String statusCode, // "0" means successful,
+        String statusCode,
 
+        @Schema(description = "Response status message", example = "success")
         @NotBlank
-        String statusMessage, // example - "success",
+        String statusMessage,
 
+        @Schema(description = "Payment reference string", example = "Paga_Auto_Ref_20250826_132929_yjmb")
         @NotBlank
-        String paymentReference, // e.g: "Paga_Auto_Ref_20250826_132929_yjmb",
+        String paymentReference,
 
+        @Schema(description = "Transaction amount string", example = "10.00")
         @NotBlank
-        String amount, // e.g: "10.00"
+        String amount,
 
+        @Schema(description = "ISO currency code", example = "NGN")
         @NotBlank
-        String  currency, // e.g: "NGN",
+        String currency,
 
+        @Schema(description = "ISO timestamp string", example = "2025-08-26T13:36:04")
         @NotBlank
-        String timeStamp, // e.g: "2025-08-26T13:36:04",
+        String timeStamp,
 
-        String description, //e.g: null,
+        @Schema(description = "Optional payment description", example = "Payment for order #1234")
+        String description,
 
+        @Schema(description = "Customer email address", example = "testemail2@gmail.com")
         @NotBlank
-        String customerEmail, // e.g: "testemail2@gmail.com",
+        String customerEmail,
 
+        @Schema(description = "Customer phone number", example = "+2348063334156")
         @NotBlank
-        String customerPhoneNumber, // e.g: "+2348063334156",
+        String customerPhoneNumber,
 
+        @Schema(description = "HMAC SHA-512 payload signature hash", example = "39453c520890841fe3a8377...")
         @NotBlank
-        String hash // "39453c520890841fe3a837701e60b7dba3f8d737696d8fa5a39e8566b9f96948eaac792e7c03783e67033c37bf6d123e1ff181f015e729e1bcfa70bd8a16ae97"
-
+        String hash
 ) {
 }

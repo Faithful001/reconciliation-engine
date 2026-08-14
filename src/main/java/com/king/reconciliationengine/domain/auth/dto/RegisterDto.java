@@ -10,12 +10,13 @@ import lombok.Setter;
 
 @Getter
 @Setter
+@Schema(description = "User registration payload")
 public class RegisterDto {
-    @Schema(description = "User's firstName", example = "John")
+    @Schema(description = "User's first name", example = "John")
     @NotNull
     private String firstName;
 
-    @Schema(description = "User's firstName", example = "Dor")
+    @Schema(description = "User's last name", example = "Doe")
     @NotNull
     private String lastName;
 

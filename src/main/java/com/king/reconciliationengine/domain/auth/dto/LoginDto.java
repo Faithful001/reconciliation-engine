@@ -9,6 +9,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
+@Schema(description = "User login credentials payload")
 public class LoginDto {
     @Schema(description = "User's email address", example = "johndoe@example.com")
     @NotBlank
